@@ -110,6 +110,12 @@
 - 2026년 11월 점검 반영: 나피리(25.6), 요릭(25.7), 클레드(25.14), 쉬바나(26.6), 멜(26.22) 리워크, 신규 유나라·자헨·로크 추가
 - 다음: 사용자 검토 → 신짜오 사용 상황 → 나머지 숙련 챔피언 목록
 
+## 웹 페이지 (1차 버전)
+- 추천 엔진: web/engine.js (테스트: node web/test_engine.js)
+- 화면: web/app.html → 빌드하면 web/dist/index.html (python3 scripts/build_web.py)
+- 데이터: data/ → web/data.json (scripts/export_web.py가 자동 생성)
+- 데이터를 고친 뒤에는 build_web.py만 다시 돌리면 됨
+
 ## 저장 위치
 GitHub 저장소 shinemusket0217/lol-champ
 

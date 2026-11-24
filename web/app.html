@@ -1,0 +1,333 @@
+<meta charset="utf-8">
+<title>정글 픽 도우미</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에 밴픽 보드(우리 팀 / 상대 팀 두 열), 아래에 조합 요약과 추천 카드 목록 */
+:root {
+  --bg: #f3f4f1; --surface: #ffffff; --line: #d9ddd6; --fg: #1c211f; --muted: #5c655f;
+  --blue: #2b62c9; --blue-soft: #e4ecfb; --red: #c23b32; --red-soft: #f9e5e3;
+  --good: #23804f; --bad: #b8402f; --note: #8a6a12; --accent: #1f6f5c;
+  --font-display: "Do Hyeon", "IBM Plex Sans KR", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans KR", system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141816; --surface: #1c211f; --line: #303834; --fg: #e8ece9; --muted: #9aa49e;
+  --blue: #7aa2f0; --blue-soft: #1d2a44; --red: #ef7f75; --red-soft: #3b2120;
+  --good: #5fca8f; --bad: #f08a78; --note: #e0bd5c; --accent: #5cc3a6; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #141816; --surface: #1c211f; --line: #303834; --fg: #e8ece9; --muted: #9aa49e;
+  --blue: #7aa2f0; --blue-soft: #1d2a44; --red: #ef7f75; --red-soft: #3b2120;
+  --good: #5fca8f; --bad: #f08a78; --note: #e0bd5c; --accent: #5cc3a6; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin-bottom: 18px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 2rem; margin: 0; letter-spacing: 0.01em; }
+.sub { color: var(--muted); margin: 0; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 6px 12px; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .board { grid-template-columns: 1fr; } }
+.team { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.team h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.3rem; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+.team h2::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.team.blue { --c: var(--blue); --soft: var(--blue-soft); }
+.team.red { --c: var(--red); --soft: var(--red-soft); }
+.slot { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 8px; margin-top: 6px; position: relative; }
+.lane { font-size: 0.8rem; letter-spacing: 0.04em; color: var(--muted); }
+.slot input { width: 100%; font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.slot input.filled { background: var(--soft); border-color: var(--c); font-weight: 500; }
+.slot.me .pick { padding: 7px 10px; border-radius: 8px; border: 1px dashed var(--c); color: var(--c); font-weight: 500; }
+.menu { position: absolute; left: 52px; right: 0; top: 100%; z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  margin-top: 2px; max-height: 220px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+.menu div { padding: 6px 10px; cursor: pointer; }
+.menu div[aria-selected="true"], .menu div:hover { background: var(--soft); }
+.bans { margin-top: 12px; display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
+.bans input { width: 100%; font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+.example { font-size: 0.85rem; color: var(--note); margin: 10px 0 0; }
+
+.summary { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .summary { grid-template-columns: 1fr; } }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.box h3 { margin: 0 0 8px; font-size: 0.95rem; color: var(--muted); font-weight: 500; letter-spacing: 0.02em; }
+.need { font-family: var(--font-display); font-size: 1.6rem; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font-size: 0.82rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
+.chip.warn { border-color: var(--bad); color: var(--bad); }
+
+h2.sec { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; margin: 28px 0 10px; }
+.recs { display: grid; gap: 10px; }
+.rec { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; grid-template-columns: 2.2rem 1fr; gap: 4px 12px; min-width: 0; }
+.rank { font-family: var(--font-display); font-size: 1.5rem; color: var(--muted); line-height: 1; padding-top: 2px; }
+.rec.top .rank { color: var(--accent); }
+.rec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
+.rec-name { font-weight: 700; font-size: 1.1rem; }
+.score { font-variant-numeric: tabular-nums; font-weight: 700; }
+.score.pos { color: var(--good); } .score.neg { color: var(--bad); }
+.meta { color: var(--muted); font-size: 0.85rem; }
+.bar { grid-column: 2; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--accent); }
+.reasons { grid-column: 2; list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 2px; font-size: 0.9rem; }
+.reasons li { padding-left: 1.2em; text-indent: -1.2em; overflow-wrap: anywhere; }
+.reasons .p::before { content: "+ "; color: var(--good); font-weight: 700; }
+.reasons .m::before { content: "− "; color: var(--bad); font-weight: 700; }
+.reasons .n::before { content: "• "; color: var(--note); font-weight: 700; }
+.more { margin-top: 10px; }
+.empty { color: var(--muted); }
+footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>정글 픽 도우미</h1>
+      <p class="sub">우리 팀과 상대 팀을 넣으면 내 정글 챔피언 중 무엇을 고를지 추천해요.</p>
+    </div>
+    <div class="toolbar">
+      <button id="btn-example" type="button">예시 불러오기</button>
+      <button id="btn-clear" type="button">모두 지우기</button>
+    </div>
+  </header>
+
+  <section class="board" aria-label="밴픽">
+    <div class="team blue"><h2>우리 팀</h2><div id="ally"></div></div>
+    <div class="team red"><h2>상대 팀</h2><div id="enemy"></div>
+      <div class="bans"><span class="lane">밴</span><input id="bans" placeholder="밴된 챔피언 (쉼표로 구분)" autocomplete="off"></div>
+    </div>
+  </section>
+  <p class="example" id="example-note" hidden>지금 보이는 건 예시 조합이에요. 칸을 고쳐서 실제 밴픽을 넣으세요.</p>
+
+  <section class="summary" aria-label="조합 요약">
+    <div class="box"><h3>우리 팀이 필요한 정글</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div><div class="chips" id="ally-chips"></div></div>
+    <div class="box"><h3>상대 조합</h3><div class="chips" id="enemy-chips"></div></div>
+  </section>
+
+  <h2 class="sec">추천</h2>
+  <div class="recs" id="recs"></div>
+  <button class="more" id="btn-more" type="button" hidden>나머지 보기</button>
+
+  <footer>숙련도 2 이상인 내 챔피언만 추천해요. 점수는 AD/AP 규칙, 숙련도, 상성, CC 취약도, 챔피언별 규칙을 합친 값이에요.</footer>
+</div>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const ALLY_LANES = ["탑", "정글", "미드", "원딜", "서폿"];
+  const EXAMPLE = {
+    ally: { 탑: "가렌", 미드: "제드", 원딜: "징크스", 서폿: "레오나" },
+    enemy: { 탑: "피오라", 정글: "마스터 이", 미드: "야스오", 원딜: "베인", 서폿: "파이크" },
+    bans: "리 신",
+  };
+  const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+  const chosung = (s) => [...s].map((ch) => {
+    const c = ch.charCodeAt(0) - 0xac00;
+    return c >= 0 && c < 11172 ? CHO[Math.floor(c / 588)] : ch;
+  }).join("");
+
+  let DATA = null, NAMES = [], showAll = false, isExample = false;
+  const state = { ally: {}, enemy: {}, bans: "" };
+
+  const save = () => { try { localStorage.setItem("jungle-draft", JSON.stringify(state)); } catch (e) {} };
+  const load = () => { try { return JSON.parse(localStorage.getItem("jungle-draft") || "null"); } catch (e) { return null; } };
+
+  function search(q) {
+    q = q.trim().replace(/\s/g, "");
+    if (!q) return [];
+    return NAMES.filter((n) => {
+      const flat = n.replace(/\s/g, "");
+      return flat.includes(q) || chosung(flat).includes(q);
+    }).slice(0, 8);
+  }
+
+  function makeSlot(side, lane) {
+    const wrap = document.createElement("div");
+    wrap.className = "slot";
+    const label = document.createElement("span");
+    label.className = "lane";
+    label.textContent = lane;
+    wrap.appendChild(label);
+    if (side === "ally" && lane === "정글") {
+      wrap.classList.add("me");
+      const me = document.createElement("div");
+      me.className = "pick";
+      me.textContent = "나 (추천 받을 자리)";
+      wrap.appendChild(me);
+      return wrap;
+    }
+    const input = document.createElement("input");
+    input.id = `${side}-${lane}`;
+    input.placeholder = "챔피언 이름이나 초성";
+    input.autocomplete = "off";
+    input.setAttribute("aria-label", `${side === "ally" ? "우리" : "상대"} ${lane}`);
+    const menu = document.createElement("div");
+    menu.className = "menu";
+    menu.hidden = true;
+    let items = [], active = 0;
+    const commit = (name) => {
+      input.value = name;
+      state[side][lane] = name;
+      menu.hidden = true;
+      onChange();
+    };
+    const render = () => {
+      menu.innerHTML = "";
+      items.forEach((n, i) => {
+        const d = document.createElement("div");
+        d.textContent = n;
+        d.setAttribute("aria-selected", i === active ? "true" : "false");
+        d.addEventListener("mousedown", (e) => { e.preventDefault(); commit(n); });
+        menu.appendChild(d);
+      });
+      menu.hidden = items.length === 0;
+    };
+    input.addEventListener("input", () => {
+      items = search(input.value); active = 0; render();
+      if (!input.value.trim()) { delete state[side][lane]; onChange(); }
+    });
+    input.addEventListener("keydown", (e) => {
+      if (menu.hidden) return;
+      if (e.key === "ArrowDown") { active = Math.min(items.length - 1, active + 1); render(); e.preventDefault(); }
+      else if (e.key === "ArrowUp") { active = Math.max(0, active - 1); render(); e.preventDefault(); }
+      else if (e.key === "Enter") { if (items[active]) commit(items[active]); e.preventDefault(); }
+      else if (e.key === "Escape") { menu.hidden = true; }
+    });
+    input.addEventListener("blur", () => {
+      menu.hidden = true;
+      const exact = NAMES.find((n) => n.replace(/\s/g, "") === input.value.trim().replace(/\s/g, ""));
+      if (exact) commit(exact);
+      else if (input.value.trim() && !NAMES.includes(state[side][lane])) { delete state[side][lane]; onChange(); }
+    });
+    wrap.appendChild(input);
+    wrap.appendChild(menu);
+    return wrap;
+  }
+
+  function fillInputs() {
+    for (const side of ["ally", "enemy"]) for (const lane of ALLY_LANES) {
+      const el = document.getElementById(`${side}-${lane}`);
+      if (el) el.value = state[side][lane] || "";
+    }
+    document.getElementById("bans").value = state.bans || "";
+    refreshFilled();
+  }
+
+  function refreshFilled() {
+    document.querySelectorAll(".slot input").forEach((el) => el.classList.toggle("filled", NAMES.includes(el.value)));
+  }
+
+  function chip(text, warn) {
+    const s = document.createElement("span");
+    s.className = "chip" + (warn ? " warn" : "");
+    s.textContent = text;
+    return s;
+  }
+
+  function onChange(fromUser = true) {
+    if (fromUser && isExample) { isExample = false; document.getElementById("example-note").hidden = true; }
+    refreshFilled();
+    save();
+    const ally = Object.entries(state.ally).filter(([l, n]) => l !== "정글" && NAMES.includes(n)).map(([lane, name]) => ({ lane, name }));
+    const enemy = Object.entries(state.enemy).filter(([, n]) => NAMES.includes(n)).map(([lane, name]) => ({ lane, name }));
+    const bans = (state.bans || "").split(/[,\s]+/).map((s) => s.trim()).filter(Boolean)
+      .map((b) => NAMES.find((n) => n.replace(/\s/g, "") === b.replace(/\s/g, ""))).filter(Boolean);
+    const r = JungleEngine.recommend(DATA, ally, enemy, { bans });
+
+    const needText = { AD: "AD 정글", AP: "AP 정글", 혼합또는AP: "혼합 딜 또는 AP 정글" }[r.ally.need];
+    document.getElementById("need").textContent = needText;
+    document.getElementById("need-why").textContent = r.ally.why;
+    const ac = document.getElementById("ally-chips"); ac.innerHTML = "";
+    if (ally.length >= 3) {
+      ac.appendChild(chip(`앞라인 ${r.ally.tanks.length}명`, r.ally.tanks.length === 0));
+      ac.appendChild(chip(`이니시 ${r.ally.engage.length}명`, r.ally.engage.length === 0));
+      ac.appendChild(chip(`딜러 ${r.ally.carries.length}명`, r.ally.carries.length <= 1));
+    }
+    if (r.ally.adcIsMage) ac.appendChild(chip("우리 원딜이 비원딜"));
+    if (r.ally.yasuo) ac.appendChild(chip("야스오 에어본 연계"));
+
+    const ec = document.getElementById("enemy-chips"); ec.innerHTML = "";
+    const E = r.enemy;
+    if (!enemy.length) ec.appendChild(chip("아직 상대가 없어요"));
+    else {
+      ec.appendChild(chip(`${E.count}명 공개`));
+      ec.appendChild(chip(`AD ${E.adCount}명`, E.adCount >= 4));
+      ec.appendChild(chip(`평타 위주 ${E.autoCount}명`, E.autoCount >= 3));
+      if (E.tanks.length) ec.appendChild(chip(`탱커 ${E.tanks.join(", ")}`));
+      const order = ["확정", "직선", "광역즉시", "광역지연", "지형"];
+      order.forEach((s) => { if (E.shapes[s]) ec.appendChild(chip(`${s} CC ${E.shapes[s]}`, s === "확정" && E.shapes[s] >= 3)); });
+      E.protectors.forEach((p) => ec.appendChild(chip(`보호 ${p.name} (${p.tier})`, p.tier === "최상")));
+      if (E.stealth.length) ec.appendChild(chip(`은신 ${E.stealth.join(", ")}`));
+      if (E.adcIsMage) ec.appendChild(chip("상대 원딜이 비원딜"));
+      E.wild.forEach((w) => ec.appendChild(chip(`${w.champ} ${w.skill}: ${w.type}`)));
+    }
+
+    const box = document.getElementById("recs"); box.innerHTML = "";
+    const list = showAll ? r.recs : r.recs.slice(0, 6);
+    const max = Math.max(1, ...r.recs.map((x) => x.score));
+    list.forEach((x, i) => {
+      const card = document.createElement("article");
+      card.className = "rec" + (i < 3 ? " top" : "");
+      const pct = Math.max(0, Math.min(100, (x.score / max) * 100));
+      card.innerHTML = `<div class="rank">${i + 1}</div>
+        <div class="rec-head"><span class="rec-name"></span>
+          <span class="score ${x.score >= 0 ? "pos" : "neg"}">${x.score > 0 ? "+" : ""}${x.score}</span>
+          <span class="meta">숙련도 ${x.prof} · ${x.damage}</span></div>
+        <div class="bar"><span style="width:${pct}%"></span></div>
+        <ul class="reasons"></ul>`;
+      card.querySelector(".rec-name").textContent = x.name;
+      const ul = card.querySelector(".reasons");
+      const add = (cls, t) => { const li = document.createElement("li"); li.className = cls; li.textContent = t; ul.appendChild(li); };
+      x.pros.forEach((t) => add("p", t));
+      x.cons.forEach((t) => add("m", t));
+      x.notes.forEach((t) => add("n", t));
+      if (!ul.children.length) add("n", "특별한 장단점 없음 (숙련도만 반영)");
+      box.appendChild(card);
+    });
+    if (!r.recs.length) box.innerHTML = '<p class="empty">추천할 챔피언이 없어요.</p>';
+    const more = document.getElementById("btn-more");
+    more.hidden = r.recs.length <= 6;
+    more.textContent = showAll ? "상위 6명만 보기" : `나머지 ${r.recs.length - 6}명 보기`;
+  }
+
+  function setExample() {
+    state.ally = { ...EXAMPLE.ally }; state.enemy = { ...EXAMPLE.enemy }; state.bans = EXAMPLE.bans;
+    isExample = true; document.getElementById("example-note").hidden = false;
+    fillInputs(); onChange(false);
+  }
+
+  async function start() {
+    const res = await fetch("data.json");
+    DATA = await res.json();
+    NAMES = Object.keys(DATA.champions).sort((a, b) => a.localeCompare(b, "ko"));
+    const ally = document.getElementById("ally"), enemy = document.getElementById("enemy");
+    ALLY_LANES.forEach((l) => { ally.appendChild(makeSlot("ally", l)); enemy.appendChild(makeSlot("enemy", l)); });
+    document.getElementById("bans").addEventListener("input", (e) => { state.bans = e.target.value; onChange(); });
+    document.getElementById("btn-example").addEventListener("click", setExample);
+    document.getElementById("btn-clear").addEventListener("click", () => {
+      state.ally = {}; state.enemy = {}; state.bans = ""; isExample = false;
+      document.getElementById("example-note").hidden = true; fillInputs(); onChange(false);
+    });
+    document.getElementById("btn-more").addEventListener("click", () => { showAll = !showAll; onChange(false); });
+    const saved = load();
+    if (saved && (Object.keys(saved.ally || {}).length || Object.keys(saved.enemy || {}).length)) {
+      Object.assign(state, saved); fillInputs(); onChange(false);
+    } else setExample();
+  }
+  start().catch((e) => {
+    document.getElementById("recs").innerHTML = '<p class="empty">데이터를 불러오지 못했어요. 페이지를 새로고침해 주세요.</p>';
+    console.error(e);
+  });
+})();
+</script>
