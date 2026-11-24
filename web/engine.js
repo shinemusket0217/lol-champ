@@ -153,6 +153,10 @@
       const list = [...new Set([...E.assassins, ...E.duelists])];
       return list.length ? list.join(", ") : null;
     },
+    aa_null: (data, name, A, E) => {
+      const aa = E.wild.filter((w) => w.type === "평타 무력화");
+      return aa.length ? aa.map((w) => `${w.champ} ${w.skill}`).join(", ") : null;
+    },
     pick_heavy: (data, name, A, E) => {
       const sure = E.ccList.filter((c) => c.shape === "확정");
       if (sure.length >= 3) return `확정 CC ${sure.length}개: ${sure.map((c) => `${c.champ} ${c.key}`).join(", ")}`;
