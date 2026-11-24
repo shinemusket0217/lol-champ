@@ -113,9 +113,15 @@ def parse_session(session, name_of):
     me = session.get("localPlayerCellId")
     ally, enemy = [], []
     my_position = None
+    # 자기 차례에 올려두고 아직 확정 안 한 챔피언은 actions에만 있다
+    turn_hover = {}
+    for group in session.get("actions", []):
+        for a in group:
+            if a.get("type") == "pick" and not a.get("completed") and a.get("championId"):
+                turn_hover[a.get("actorCellId")] = a.get("championId")
     for p in session.get("myTeam", []):
         pos = POSITION.get(p.get("assignedPosition") or "")
-        cid = p.get("championId") or p.get("championPickIntent")
+        cid = p.get("championId") or turn_hover.get(p.get("cellId")) or p.get("championPickIntent")
         if p.get("cellId") == me:
             my_position = pos
             continue
