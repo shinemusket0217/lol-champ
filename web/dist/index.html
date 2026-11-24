@@ -63,6 +63,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip { font-size: 0.82rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
 .chip.warn { border-color: var(--bad); color: var(--bad); }
+.warns { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; font-size: 0.9rem; }
+.warns:empty { display: none; }
+.warns li { padding: 6px 10px; border-radius: 8px; border-left: 3px solid var(--k); background: var(--bg); }
+.warns b { color: var(--k); margin-right: 4px; }
+.w-bad { --k: var(--bad); } .w-warn { --k: var(--note); } .w-note { --k: var(--muted); }
 
 h2.sec { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; margin: 28px 0 10px; }
 .recs { display: grid; gap: 10px; }
@@ -108,7 +113,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
   <p class="example" id="example-note" hidden>지금 보이는 건 예시 조합이에요. 칸을 고쳐서 실제 밴픽을 넣으세요.</p>
 
   <section class="summary" aria-label="조합 요약">
-    <div class="box"><h3>우리 팀이 필요한 정글</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div><div class="chips" id="ally-chips"></div></div>
+    <div class="box"><h3>우리 조합</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div>
+      <ul class="warns" id="ally-warns"></ul><div class="chips" id="ally-chips"></div></div>
     <div class="box"><h3>상대 조합</h3><div class="chips" id="enemy-chips"></div></div>
   </section>
 
@@ -183,14 +189,40 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       why = `미드 ${mid ? mid.name : ""}가 AD이고 미드를 뺀 AP가 없음`;
     }
 
-    const tanks = ally.filter((p) => isTank(dmgOf(data, p)));
+    const tanks = ally.filter((p) => isTank(dmgOf(data, p)) || /탱커|브루저/.test((data.champions[p.name] || {}).role || "") && !/카운터/.test((data.champions[p.name] || {}).role || ""));
     const engage = ally.filter((p) => (data.cc[p.name] || []).some((c) => c.use.includes("이니시")));
     const adc = byLane["원딜"];
     const adcIsMage = adc ? dmgOf(data, adc) === "AP" : false;
     const carries = ally.filter((p) => p.lane !== "서폿" && !isTank(dmgOf(data, p)));
     const yasuo = ally.some((p) => p.name === "야스오");
 
-    return { midCls, apOthers, need, why, tanks, engage, adcIsMage, carries, yasuo, byLane, count: ally.length };
+    const ccList = [];
+    ally.forEach((p) => (data.cc[p.name] || []).forEach((c) => ccList.push({ ...c, champ: p.name, lane: p.lane })));
+    const shapes = {};
+    ccList.forEach((c) => (shapes[c.shape] = (shapes[c.shape] || 0) + 1));
+    const dmgCount = { AD: 0, AP: 0, 혼합: 0, 탱커: 0 };
+    ally.forEach((p) => {
+      const c = dmgOf(data, p);
+      if (isTank(c)) dmgCount.탱커 += 1;
+      else dmgCount[c] = (dmgCount[c] || 0) + 1;
+    });
+    const auto = ally.filter((p) => data.champions[p.name] && data.champions[p.name].auto);
+
+    // 경고: 골드 구간에서 치명적인 것 위주 (우리 팀 4명 중 3명 이상 골랐을 때만)
+    const warnings = [];
+    if (ally.length >= 3) {
+      if (tanks.length === 0) warnings.push({ level: "위험", text: "앞라인이 없어요. 탱커나 브루저 정글을 고르면 좋아요." });
+      if (engage.length === 0) warnings.push({ level: "위험", text: "한타를 열 이니시가 없어요." });
+      if (ccList.length <= 2) warnings.push({ level: ccList.length === 0 ? "위험" : "주의", text: `하드 CC가 ${ccList.length}개뿐이에요. CC가 많은 정글이 좋아요.` });
+      if (carries.length <= 1) warnings.push({ level: "주의", text: "딜러가 부족해요. 캐리할 수 있는 정글이 좋아요." });
+      if (adcIsMage) warnings.push({ level: "참고", text: "원딜 자리가 비원딜이에요. 그레이브즈처럼 원딜 역할을 할 정글이 좋아요." });
+      if (yasuo) warnings.push({ level: "참고", text: "야스오가 있어요. 넉업, 넉백, 끌어당김 CC가 있는 정글과 연계돼요." });
+    }
+
+    return {
+      midCls, apOthers, need, why, tanks, engage, adcIsMage, carries, yasuo, byLane, count: ally.length,
+      ccList, shapes, dmgCount, auto, warnings,
+    };
   }
 
   function analyzeEnemy(data, enemy) {
@@ -311,6 +343,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       plus(2, "우리 팀에 앞라인이 없음");
     if (A.count >= 3 && A.engage.length === 0 && myCC.some((c) => c.use.includes("이니시")))
       plus(2, "우리 팀에 이니시가 없음");
+    if (A.count >= 3 && A.ccList.length <= 2 && myCC.length >= 2)
+      plus(1.5, `우리 팀 하드 CC가 ${A.ccList.length}개뿐인데 하드 CC ${myCC.length}개`);
 
     // 암살·돌진 정글 공통
     if (ASSASSIN_JUNGLE.includes(name)) {
@@ -391,9 +425,6 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       const good = Object.values(E.byLane).filter((p) => data.champions[p.name] && data.champions[p.name].sylasUlt);
       if (good.length >= 2) plus(3, `빼앗기 좋은 궁극기 ${good.length}개: ${good.map((p) => p.name).join(", ")}`);
       else if (E.count >= 4) minus(2, "빼앗기 좋은 궁극기가 부족함");
-    },
-    "볼리베어": ({ A, plus }) => {
-      if (A.count >= 3 && A.tanks.length === 0) plus(2, "우리 팀에 탱커가 필요함");
     },
     "바이": ({ E, plus }) => {
       if (E.longMobility.length) plus(1, `거리가 먼 이동기도 따라감: ${E.longMobility.join(", ")}`);
@@ -548,14 +579,32 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
     const needText = { AD: "AD 정글", AP: "AP 정글", 혼합또는AP: "혼합 딜 또는 AP 정글" }[r.ally.need];
     document.getElementById("need").textContent = needText;
     document.getElementById("need-why").textContent = r.ally.why;
-    const ac = document.getElementById("ally-chips"); ac.innerHTML = "";
-    if (ally.length >= 3) {
-      ac.appendChild(chip(`앞라인 ${r.ally.tanks.length}명`, r.ally.tanks.length === 0));
-      ac.appendChild(chip(`이니시 ${r.ally.engage.length}명`, r.ally.engage.length === 0));
-      ac.appendChild(chip(`딜러 ${r.ally.carries.length}명`, r.ally.carries.length <= 1));
+    const A = r.ally;
+    const aw = document.getElementById("ally-warns"); aw.innerHTML = "";
+    A.warnings.forEach((w) => {
+      const li = document.createElement("li");
+      li.className = { 위험: "w-bad", 주의: "w-warn", 참고: "w-note" }[w.level];
+      li.innerHTML = `<b></b> <span></span>`;
+      li.querySelector("b").textContent = w.level;
+      li.querySelector("span").textContent = w.text;
+      aw.appendChild(li);
+    });
+    if (ally.length > 0 && ally.length < 3) {
+      const li = document.createElement("li"); li.className = "w-note";
+      li.textContent = "우리 팀이 3명 이상 골라야 부족한 점을 판단해요.";
+      aw.appendChild(li);
     }
-    if (r.ally.adcIsMage) ac.appendChild(chip("우리 원딜이 비원딜"));
-    if (r.ally.yasuo) ac.appendChild(chip("야스오 에어본 연계"));
+    const ac = document.getElementById("ally-chips"); ac.innerHTML = "";
+    if (ally.length) {
+      ac.appendChild(chip(`하드 CC ${A.ccList.length}개`, ally.length >= 3 && A.ccList.length <= 2));
+      ["확정", "직선", "광역즉시", "광역지연", "지형"].forEach((s) => { if (A.shapes[s]) ac.appendChild(chip(`${s} ${A.shapes[s]}`)); });
+      ac.appendChild(chip(`이니시 ${A.engage.length ? A.engage.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.engage.length));
+      ac.appendChild(chip(`앞라인 ${A.tanks.length ? A.tanks.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.tanks.length));
+      ac.appendChild(chip(`딜러 ${A.carries.length}명`, ally.length >= 3 && A.carries.length <= 1));
+      const d = A.dmgCount;
+      ac.appendChild(chip(`AD ${d.AD} · AP ${d.AP}${d.혼합 ? ` · 혼합 ${d.혼합}` : ""}${d.탱커 ? ` · 탱커 ${d.탱커}` : ""}`));
+      if (A.auto.length) ac.appendChild(chip(`평타 위주 ${A.auto.length}명`));
+    }
 
     const ec = document.getElementById("enemy-chips"); ec.innerHTML = "";
     const E = r.enemy;

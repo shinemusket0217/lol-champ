@@ -61,14 +61,40 @@
       why = `미드 ${mid ? mid.name : ""}가 AD이고 미드를 뺀 AP가 없음`;
     }
 
-    const tanks = ally.filter((p) => isTank(dmgOf(data, p)));
+    const tanks = ally.filter((p) => isTank(dmgOf(data, p)) || /탱커|브루저/.test((data.champions[p.name] || {}).role || "") && !/카운터/.test((data.champions[p.name] || {}).role || ""));
     const engage = ally.filter((p) => (data.cc[p.name] || []).some((c) => c.use.includes("이니시")));
     const adc = byLane["원딜"];
     const adcIsMage = adc ? dmgOf(data, adc) === "AP" : false;
     const carries = ally.filter((p) => p.lane !== "서폿" && !isTank(dmgOf(data, p)));
     const yasuo = ally.some((p) => p.name === "야스오");
 
-    return { midCls, apOthers, need, why, tanks, engage, adcIsMage, carries, yasuo, byLane, count: ally.length };
+    const ccList = [];
+    ally.forEach((p) => (data.cc[p.name] || []).forEach((c) => ccList.push({ ...c, champ: p.name, lane: p.lane })));
+    const shapes = {};
+    ccList.forEach((c) => (shapes[c.shape] = (shapes[c.shape] || 0) + 1));
+    const dmgCount = { AD: 0, AP: 0, 혼합: 0, 탱커: 0 };
+    ally.forEach((p) => {
+      const c = dmgOf(data, p);
+      if (isTank(c)) dmgCount.탱커 += 1;
+      else dmgCount[c] = (dmgCount[c] || 0) + 1;
+    });
+    const auto = ally.filter((p) => data.champions[p.name] && data.champions[p.name].auto);
+
+    // 경고: 골드 구간에서 치명적인 것 위주 (우리 팀 4명 중 3명 이상 골랐을 때만)
+    const warnings = [];
+    if (ally.length >= 3) {
+      if (tanks.length === 0) warnings.push({ level: "위험", text: "앞라인이 없어요. 탱커나 브루저 정글을 고르면 좋아요." });
+      if (engage.length === 0) warnings.push({ level: "위험", text: "한타를 열 이니시가 없어요." });
+      if (ccList.length <= 2) warnings.push({ level: ccList.length === 0 ? "위험" : "주의", text: `하드 CC가 ${ccList.length}개뿐이에요. CC가 많은 정글이 좋아요.` });
+      if (carries.length <= 1) warnings.push({ level: "주의", text: "딜러가 부족해요. 캐리할 수 있는 정글이 좋아요." });
+      if (adcIsMage) warnings.push({ level: "참고", text: "원딜 자리가 비원딜이에요. 그레이브즈처럼 원딜 역할을 할 정글이 좋아요." });
+      if (yasuo) warnings.push({ level: "참고", text: "야스오가 있어요. 넉업, 넉백, 끌어당김 CC가 있는 정글과 연계돼요." });
+    }
+
+    return {
+      midCls, apOthers, need, why, tanks, engage, adcIsMage, carries, yasuo, byLane, count: ally.length,
+      ccList, shapes, dmgCount, auto, warnings,
+    };
   }
 
   function analyzeEnemy(data, enemy) {
@@ -189,6 +215,8 @@
       plus(2, "우리 팀에 앞라인이 없음");
     if (A.count >= 3 && A.engage.length === 0 && myCC.some((c) => c.use.includes("이니시")))
       plus(2, "우리 팀에 이니시가 없음");
+    if (A.count >= 3 && A.ccList.length <= 2 && myCC.length >= 2)
+      plus(1.5, `우리 팀 하드 CC가 ${A.ccList.length}개뿐인데 하드 CC ${myCC.length}개`);
 
     // 암살·돌진 정글 공통
     if (ASSASSIN_JUNGLE.includes(name)) {
@@ -269,9 +297,6 @@
       const good = Object.values(E.byLane).filter((p) => data.champions[p.name] && data.champions[p.name].sylasUlt);
       if (good.length >= 2) plus(3, `빼앗기 좋은 궁극기 ${good.length}개: ${good.map((p) => p.name).join(", ")}`);
       else if (E.count >= 4) minus(2, "빼앗기 좋은 궁극기가 부족함");
-    },
-    "볼리베어": ({ A, plus }) => {
-      if (A.count >= 3 && A.tanks.length === 0) plus(2, "우리 팀에 탱커가 필요함");
     },
     "바이": ({ E, plus }) => {
       if (E.longMobility.length) plus(1, `거리가 먼 이동기도 따라감: ${E.longMobility.join(", ")}`);

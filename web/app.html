@@ -63,6 +63,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip { font-size: 0.82rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); font-variant-numeric: tabular-nums; }
 .chip.warn { border-color: var(--bad); color: var(--bad); }
+.warns { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 4px; font-size: 0.9rem; }
+.warns:empty { display: none; }
+.warns li { padding: 6px 10px; border-radius: 8px; border-left: 3px solid var(--k); background: var(--bg); }
+.warns b { color: var(--k); margin-right: 4px; }
+.w-bad { --k: var(--bad); } .w-warn { --k: var(--note); } .w-note { --k: var(--muted); }
 
 h2.sec { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; margin: 28px 0 10px; }
 .recs { display: grid; gap: 10px; }
@@ -108,7 +113,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
   <p class="example" id="example-note" hidden>지금 보이는 건 예시 조합이에요. 칸을 고쳐서 실제 밴픽을 넣으세요.</p>
 
   <section class="summary" aria-label="조합 요약">
-    <div class="box"><h3>우리 팀이 필요한 정글</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div><div class="chips" id="ally-chips"></div></div>
+    <div class="box"><h3>우리 조합</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div>
+      <ul class="warns" id="ally-warns"></ul><div class="chips" id="ally-chips"></div></div>
     <div class="box"><h3>상대 조합</h3><div class="chips" id="enemy-chips"></div></div>
   </section>
 
@@ -248,14 +254,32 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
     const needText = { AD: "AD 정글", AP: "AP 정글", 혼합또는AP: "혼합 딜 또는 AP 정글" }[r.ally.need];
     document.getElementById("need").textContent = needText;
     document.getElementById("need-why").textContent = r.ally.why;
-    const ac = document.getElementById("ally-chips"); ac.innerHTML = "";
-    if (ally.length >= 3) {
-      ac.appendChild(chip(`앞라인 ${r.ally.tanks.length}명`, r.ally.tanks.length === 0));
-      ac.appendChild(chip(`이니시 ${r.ally.engage.length}명`, r.ally.engage.length === 0));
-      ac.appendChild(chip(`딜러 ${r.ally.carries.length}명`, r.ally.carries.length <= 1));
+    const A = r.ally;
+    const aw = document.getElementById("ally-warns"); aw.innerHTML = "";
+    A.warnings.forEach((w) => {
+      const li = document.createElement("li");
+      li.className = { 위험: "w-bad", 주의: "w-warn", 참고: "w-note" }[w.level];
+      li.innerHTML = `<b></b> <span></span>`;
+      li.querySelector("b").textContent = w.level;
+      li.querySelector("span").textContent = w.text;
+      aw.appendChild(li);
+    });
+    if (ally.length > 0 && ally.length < 3) {
+      const li = document.createElement("li"); li.className = "w-note";
+      li.textContent = "우리 팀이 3명 이상 골라야 부족한 점을 판단해요.";
+      aw.appendChild(li);
     }
-    if (r.ally.adcIsMage) ac.appendChild(chip("우리 원딜이 비원딜"));
-    if (r.ally.yasuo) ac.appendChild(chip("야스오 에어본 연계"));
+    const ac = document.getElementById("ally-chips"); ac.innerHTML = "";
+    if (ally.length) {
+      ac.appendChild(chip(`하드 CC ${A.ccList.length}개`, ally.length >= 3 && A.ccList.length <= 2));
+      ["확정", "직선", "광역즉시", "광역지연", "지형"].forEach((s) => { if (A.shapes[s]) ac.appendChild(chip(`${s} ${A.shapes[s]}`)); });
+      ac.appendChild(chip(`이니시 ${A.engage.length ? A.engage.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.engage.length));
+      ac.appendChild(chip(`앞라인 ${A.tanks.length ? A.tanks.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.tanks.length));
+      ac.appendChild(chip(`딜러 ${A.carries.length}명`, ally.length >= 3 && A.carries.length <= 1));
+      const d = A.dmgCount;
+      ac.appendChild(chip(`AD ${d.AD} · AP ${d.AP}${d.혼합 ? ` · 혼합 ${d.혼합}` : ""}${d.탱커 ? ` · 탱커 ${d.탱커}` : ""}`));
+      if (A.auto.length) ac.appendChild(chip(`평타 위주 ${A.auto.length}명`));
+    }
 
     const ec = document.getElementById("enemy-chips"); ec.innerHTML = "";
     const E = r.enemy;
