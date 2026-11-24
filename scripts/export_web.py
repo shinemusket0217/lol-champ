@@ -13,7 +13,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from data.cc_source import CHAMPIONS as CC_SOURCE, TARGETED_DODGE  # noqa: E402
 from data.champions import CHAMPIONS  # noqa: E402
-from data.damage_class import AUTO_ATTACKERS, BY_LANE, damage_class  # noqa: E402
+from data.damage_class import AUTO_ATTACKERS, BY_LANE, damage_class, is_anti_tank, is_frontline  # noqa: E402
+from data.vetoes import DUELISTS, VETOES  # noqa: E402
 from data.jungle_picks import JUNGLE_PICKS  # noqa: E402
 from data.my_pool import MY_POOL  # noqa: E402
 from data.survival import HIGH_HP_TANKS, PROTECTORS, SELF_SURVIVAL  # noqa: E402
@@ -33,6 +34,8 @@ def main():
             "damageByLane": BY_LANE.get(name, {}),
             "tank": "탱커" in dmg,
             "auto": name in AUTO_ATTACKERS,
+            "antiTank": is_anti_tank(name),
+            "frontline": is_frontline(name),
             "power": c["강한_시기"],
             "sylasUlt": sylas_ult_group(name),
         }
@@ -69,6 +72,8 @@ def main():
             for n, v in MY_POOL.items()
         },
         "picks": JUNGLE_PICKS,
+        "vetoes": VETOES,
+        "duelists": DUELISTS,
     }
     out = ROOT / "web" / "data.json"
     out.parent.mkdir(exist_ok=True)

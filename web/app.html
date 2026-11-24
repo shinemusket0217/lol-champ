@@ -83,9 +83,17 @@ h2.sec { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; 
 .bar span { display: block; height: 100%; background: var(--accent); }
 .reasons { grid-column: 2; list-style: none; padding: 0; margin: 4px 0 0; display: grid; gap: 2px; font-size: 0.9rem; }
 .reasons li { padding-left: 1.2em; text-indent: -1.2em; overflow-wrap: anywhere; }
-.reasons .p::before { content: "+ "; color: var(--good); font-weight: 700; }
-.reasons .m::before { content: "− "; color: var(--bad); font-weight: 700; }
-.reasons .n::before { content: "• "; color: var(--note); font-weight: 700; }
+.reasons li { text-indent: 0; padding-left: 0; display: grid; grid-template-columns: 3.4rem 2.6rem 1fr; align-items: baseline; }
+.reasons .grp { font-size: 0.75rem; color: var(--muted); }
+.reasons .pts { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; padding-right: 6px; }
+.reasons .p .pts { color: var(--good); } .reasons .m .pts { color: var(--bad); }
+.reasons .n { display: block; color: var(--muted); }
+.vetoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.veto { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--bad); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.veto b { margin-right: 8px; }
+.veto ul { margin: 4px 0 0; padding-left: 1.1em; font-size: 0.88rem; color: var(--muted); }
+.veto li { overflow-wrap: anywhere; }
+@media (max-width: 480px) { .reasons li { grid-template-columns: 3rem 2.4rem 1fr; } }
 .more { margin-top: 10px; }
 .empty { color: var(--muted); }
 footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
@@ -122,7 +130,12 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
   <div class="recs" id="recs"></div>
   <button class="more" id="btn-more" type="button" hidden>나머지 보기</button>
 
-  <footer>숙련도 2 이상인 내 챔피언만 추천해요. 점수는 AD/AP 규칙, 숙련도, 상성, CC 취약도, 챔피언별 규칙을 합친 값이에요.</footer>
+  <section id="vetoed-sec" hidden>
+    <h2 class="sec">이번 판에 피해야 할 챔피언</h2>
+    <div class="vetoes" id="vetoed"></div>
+  </section>
+
+  <footer>숙련도 2 이상인 내 챔피언만 추천해요. 먼저 절대 금지 조건으로 거르고, 남은 챔피언은 조합에 필요한 것 > 숙련도 > 상대 대응 > 상성 순으로 무게를 둬서 점수를 매겨요.</footer>
 </div>
 
 <script>
@@ -274,7 +287,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       ac.appendChild(chip(`하드 CC ${A.ccList.length}개`, ally.length >= 3 && A.ccList.length <= 2));
       ["확정", "직선", "광역즉시", "광역지연", "지형"].forEach((s) => { if (A.shapes[s]) ac.appendChild(chip(`${s} ${A.shapes[s]}`)); });
       ac.appendChild(chip(`이니시 ${A.engage.length ? A.engage.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.engage.length));
-      ac.appendChild(chip(`앞라인 ${A.tanks.length ? A.tanks.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.tanks.length));
+      ac.appendChild(chip(`앞라인 ${A.frontline.length ? A.frontline.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.frontline.length));
+      ac.appendChild(chip(`탱커 처리 ${A.antiTank.length ? A.antiTank.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.antiTank.length && r.enemy.frontline.length >= 2));
       ac.appendChild(chip(`딜러 ${A.carries.length}명`, ally.length >= 3 && A.carries.length <= 1));
       const d = A.dmgCount;
       ac.appendChild(chip(`AD ${d.AD} · AP ${d.AP}${d.혼합 ? ` · 혼합 ${d.혼합}` : ""}${d.탱커 ? ` · 탱커 ${d.탱커}` : ""}`));
@@ -288,7 +302,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       ec.appendChild(chip(`${E.count}명 공개`));
       ec.appendChild(chip(`AD ${E.adCount}명`, E.adCount >= 4));
       ec.appendChild(chip(`평타 위주 ${E.autoCount}명`, E.autoCount >= 3));
-      if (E.tanks.length) ec.appendChild(chip(`탱커 ${E.tanks.join(", ")}`));
+      if (E.frontline.length) ec.appendChild(chip(`앞라인 ${E.frontline.join(", ")}`, E.frontline.length >= 3));
+      if (E.assassins.length || E.duelists.length) ec.appendChild(chip(`암살·1:1 강자 ${[...new Set([...E.assassins, ...E.duelists])].join(", ")}`));
       const order = ["확정", "직선", "광역즉시", "광역지연", "지형"];
       order.forEach((s) => { if (E.shapes[s]) ec.appendChild(chip(`${s} CC ${E.shapes[s]}`, s === "확정" && E.shapes[s] >= 3)); });
       E.protectors.forEach((p) => ec.appendChild(chip(`보호 ${p.name} (${p.tier})`, p.tier === "최상")));
@@ -312,14 +327,31 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
         <ul class="reasons"></ul>`;
       card.querySelector(".rec-name").textContent = x.name;
       const ul = card.querySelector(".reasons");
-      const add = (cls, t) => { const li = document.createElement("li"); li.className = cls; li.textContent = t; ul.appendChild(li); };
-      x.pros.forEach((t) => add("p", t));
-      x.cons.forEach((t) => add("m", t));
-      x.notes.forEach((t) => add("n", t));
-      if (!ul.children.length) add("n", "특별한 장단점 없음 (숙련도만 반영)");
+      Object.entries(x.groups).forEach(([g, items]) => items.forEach((it) => {
+        const li = document.createElement("li");
+        li.className = it.n > 0 ? "p" : "m";
+        li.innerHTML = `<span class="grp"></span><span class="pts"></span> <span class="txt"></span>`;
+        li.querySelector(".grp").textContent = g;
+        li.querySelector(".pts").textContent = `${it.n > 0 ? "+" : ""}${it.n}`;
+        li.querySelector(".txt").textContent = it.text;
+        ul.appendChild(li);
+      }));
+      if (!ul.children.length) { const li = document.createElement("li"); li.className = "n"; li.textContent = "특별한 장단점 없음"; ul.appendChild(li); }
       box.appendChild(card);
     });
     if (!r.recs.length) box.innerHTML = '<p class="empty">추천할 챔피언이 없어요.</p>';
+
+    const vbox = document.getElementById("vetoed"); vbox.innerHTML = "";
+    document.getElementById("vetoed-sec").hidden = !r.vetoed.length;
+    r.vetoed.forEach((v) => {
+      const row = document.createElement("div");
+      row.className = "veto";
+      row.innerHTML = `<b></b><span class="meta"></span><ul></ul>`;
+      row.querySelector("b").textContent = v.name;
+      row.querySelector(".meta").textContent = `숙련도 ${v.prof}`;
+      v.reasons.forEach((t) => { const li = document.createElement("li"); li.textContent = t; row.querySelector("ul").appendChild(li); });
+      vbox.appendChild(row);
+    });
     const more = document.getElementById("btn-more");
     more.hidden = r.recs.length <= 6;
     more.textContent = showAll ? "상위 6명만 보기" : `나머지 ${r.recs.length - 6}명 보기`;

@@ -77,3 +77,33 @@ def all_ad(team):
     """탱커를 빼고 딜러가 전부 AD인가."""
     dealers = [damage_class(n, l) for n, l in team if "탱커" not in damage_class(n, l)]
     return bool(dealers) and all(d == "AD" for d in dealers)
+
+
+# ---------- 탱커 처리 능력, 앞라인 ----------
+# 탱커 처리: 딜 방식에 최대 체력 %, 고정 피해, 현재 체력 비례 피해가 있으면 "있음". 탱커는 세지 않는다.
+ANTI_TANK_REMOVE = {"아리", "신 짜오", "엘리스", "니달리", "리 신", "제이스", "그라가스", "오로라"}
+ANTI_TANK_EXTRA = set()
+# 앞라인: 탱커, 또는 역할에 탱커·브루저가 있는 챔피언 ("탱커 카운터"는 제외). 브루저도 앞라인 (사용자)
+FRONTLINE_EXTRA = {"바이", "자르반 4세"}
+
+import re as _re  # noqa: E402
+
+_ANTI = _re.compile(r"최대 체력 %|고정 피해|현재 체력 비례|% 고정")
+
+
+def is_frontline(name):
+    role = CHAMPIONS[name]["역할"]
+    cls = damage_class(name)
+    return name in FRONTLINE_EXTRA or "탱커" in cls or cls == "반AP" or (
+        bool(_re.search("탱커|브루저", role)) and "카운터" not in role
+    )
+
+
+def is_anti_tank(name):
+    if "탱커" in damage_class(name) or damage_class(name) == "반AP":
+        return False
+    if name in ANTI_TANK_EXTRA:
+        return True
+    if name in ANTI_TANK_REMOVE:
+        return False
+    return any(_ANTI.search(d) for d in CHAMPIONS[name]["딜_방식"])
