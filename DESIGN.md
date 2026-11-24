@@ -115,6 +115,8 @@
 - 화면: web/app.html → 빌드하면 web/dist/index.html (python3 scripts/build_web.py)
 - 데이터: data/ → web/data.json (scripts/export_web.py가 자동 생성)
 - 데이터를 고친 뒤에는 build_web.py만 다시 돌리면 됨
+- 우리 조합 경고 (우리 팀 3명 이상일 때): 앞라인 없음, 이니시 없음, 하드 CC 2개 이하, 딜러 1명 이하, 비원딜, 야스오
+- 앞라인: 탱커와 브루저를 모두 셈 (사용자 확인)
 
 ## 저장 위치
 GitHub 저장소 shinemusket0217/lol-champ
