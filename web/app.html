@@ -54,6 +54,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .bans { margin-top: 12px; display: grid; grid-template-columns: 44px 1fr; gap: 8px; align-items: center; }
 .bans input { width: 100%; font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 .example { font-size: 0.85rem; color: var(--note); margin: 10px 0 0; }
+.live { margin-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 0.9rem;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.live.on .dot { background: var(--good); }
+.live label { margin-left: auto; display: flex; gap: 6px; align-items: center; color: var(--muted); }
 
 .summary { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 720px) { .summary { grid-template-columns: 1fr; } }
@@ -119,6 +124,10 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
     </div>
   </section>
   <p class="example" id="example-note" hidden>지금 보이는 건 예시 조합이에요. 칸을 고쳐서 실제 밴픽을 넣으세요.</p>
+  <div class="live" id="live" hidden>
+    <span class="dot" id="live-dot"></span><span id="live-text">롤 클라이언트 확인 중</span>
+    <label><input type="checkbox" id="live-on" checked> 자동 채우기</label>
+  </div>
 
   <section class="summary" aria-label="조합 요약">
     <div class="box"><h3>우리 조합</h3><p class="need" id="need">-</p><div class="meta" id="need-why"></div>
@@ -381,6 +390,80 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
     if (saved && (Object.keys(saved.ally || {}).length || Object.keys(saved.enemy || {}).length)) {
       Object.assign(state, saved); fillInputs(); onChange(false);
     } else setExample();
+    if (["localhost", "127.0.0.1"].includes(location.hostname)) startLive();
+  }
+
+  // ---------- 롤 클라이언트 자동 채우기 (tools/live_helper.py로 내 컴퓨터에서 열었을 때만) ----------
+
+  const norm = (s) => (s || "").replace(/\s/g, "");
+  const toName = (s) => NAMES.find((n) => norm(n) === norm(s)) || null;
+
+  // 상대 포지션 추정: 챔피언의 주 라인 순서로 점수를 매겨 가장 그럴듯하게 배치
+  function guessLanes(names, lanes) {
+    let best = null, bestScore = -1;
+    const fit = (n, lane) => {
+      const ls = (DATA.champions[n] || {}).lanes || [];
+      const i = ls.indexOf(lane);
+      return i < 0 ? 0 : 3 - Math.min(i, 2);
+    };
+    const go = (i, used, acc, score) => {
+      if (i === names.length) { if (score > bestScore) { bestScore = score; best = acc.slice(); } return; }
+      lanes.forEach((l) => {
+        if (used.has(l)) return;
+        used.add(l); acc.push(l);
+        go(i + 1, used, acc, score + fit(names[i], l));
+        used.delete(l); acc.pop();
+      });
+    };
+    go(0, new Set(), [], 0);
+    const out = {};
+    (best || []).forEach((l, i) => (out[l] = names[i]));
+    return out;
+  }
+
+  let lastSig = "";
+  function applyDraft(d) {
+    const ally = {}, unplaced = [];
+    d.ally.forEach((p) => {
+      const n = toName(p.name);
+      if (!n) return;
+      if (p.position && p.position !== "정글" && !ally[p.position]) ally[p.position] = n;
+      else unplaced.push(n);
+    });
+    Object.assign(ally, guessLanes(unplaced, ["탑", "미드", "원딜", "서폿"].filter((l) => !ally[l])));
+    const enemyNames = d.enemy.map(toName).filter(Boolean);
+    state.ally = ally;
+    state.enemy = guessLanes(enemyNames, ALLY_LANES);
+    state.bans = d.bans.map(toName).filter(Boolean).join(", ");
+    isExample = false; document.getElementById("example-note").hidden = true;
+    fillInputs(); onChange(false);
+  }
+
+  function startLive() {
+    const box = document.getElementById("live"), text = document.getElementById("live-text");
+    const toggle = document.getElementById("live-on");
+    box.hidden = false;
+    const tick = async () => {
+      try {
+        const res = await fetch("api/draft", { cache: "no-store" });
+        const d = await res.json();
+        box.classList.toggle("on", d.status === "champ_select");
+        if (d.status === "no_client") text.textContent = "롤 클라이언트를 찾지 못했어요. 클라이언트를 켜면 자동으로 연결돼요.";
+        else if (d.status !== "champ_select") text.textContent = "롤 클라이언트 연결됨. 밴픽에 들어가면 자동으로 채워져요.";
+        else {
+          const note = d.myPosition && d.myPosition !== "정글" ? ` (내 포지션: ${d.myPosition}. 추천은 정글 기준이에요)` : "";
+          text.textContent = `밴픽 진행 중: 상대 ${d.enemy.length}명 공개${note}. 상대 포지션은 추정이라 틀리면 직접 고쳐 주세요.`;
+          const sig = JSON.stringify(d);
+          if (toggle.checked && sig !== lastSig) { lastSig = sig; applyDraft(d); }
+        }
+      } catch (e) {
+        text.textContent = "도우미 프로그램과 연결이 끊겼어요. live_helper.py가 실행 중인지 확인해 주세요.";
+        box.classList.remove("on");
+      }
+      setTimeout(tick, 1500);
+    };
+    toggle.addEventListener("change", () => { lastSig = ""; });
+    tick();
   }
   start().catch((e) => {
     document.getElementById("recs").innerHTML = '<p class="empty">데이터를 불러오지 못했어요. 페이지를 새로고침해 주세요.</p>';

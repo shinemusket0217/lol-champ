@@ -131,6 +131,12 @@
 - 우리 조합 경고 (우리 팀 3명 이상일 때): 앞라인 없음, 이니시 없음, 하드 CC 2개 이하, 딜러 1명 이하, 비원딜, 야스오
 - 앞라인: 탱커와 브루저를 모두 셈 (사용자 확인)
 
+## 밴픽 자동 채우기 (윈도우)
+- tools/live_helper.py: 롤 클라이언트 로컬 API(LCU)에서 밴픽을 읽고, web/dist를 localhost:8840에서 띄움. 페이지가 /api/draft를 1.5초마다 읽어 칸을 채움
+- 상대 포지션은 챔피언 주 라인으로 추정 (클라이언트가 안 알려줌)
+- 테스트: python tools/live_helper.py --mock
+- 사용법: tools/README.md
+
 ## 저장 위치
 GitHub 저장소 shinemusket0217/lol-champ
 
