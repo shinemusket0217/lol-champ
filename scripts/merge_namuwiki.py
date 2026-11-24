@@ -24,6 +24,18 @@ from extract_names import extract  # noqa: E402
 OVERRIDES = {
     ("브라이어", "불리"): {"람머스"},  # 사용자: 방관 빌드로 대응 가능
     ("잭스", "불리"): {"렝가"},  # 원문: 잭스가 렝가의 하드 카운터
+    ("신 짜오", "불리"): {"카직스"},  # 카직스 문서(2026 시즌)가 더 최신: 신짜오가 카직스에게 강함
+    ("바이", "불리"): {"헤카림"},  # 바이 문서는 10.24 기준. 헤카림 문서(최근)는 바이가 헤카림을 억제
+    ("렉사이", "불리"): {"헤카림"},  # 문서끼리 반대. 판단 보류
+    ("헤카림", "불리"): {"렉사이"},  # 위와 같음
+    ("사일러스", "불리"): {"아무무"},  # 초반은 아무무, 한타는 사일러스. 시기에 따라 다름
+    ("아무무", "불리"): {"사일러스"},  # 위와 같음
+}
+
+# (챔피언, 목록) -> 더할 챔피언. 다른 챔피언 문서에서 확인된 상성
+ADDITIONS = {
+    ("신 짜오", "유리"): ["카직스"],  # 카직스 문서: 2026 시즌 리 신, 신짜오에게 특히 약함
+    ("바이", "유리"): ["헤카림"],  # 헤카림 문서(최근): 바이가 헤카림을 억제
 }
 
 HEADER = '''# 사용자 정글 챔피언별 고르는 상황
@@ -60,7 +72,8 @@ def names_from(name, kind):
             if x != name and x not in out:
                 out.append(x)
     drop = OVERRIDES.get((name, kind), set())
-    return [x for x in out if x not in drop]
+    out = [x for x in out if x not in drop]
+    return out + [x for x in ADDITIONS.get((name, kind), []) if x not in out]
 
 
 def draft_from_namuwiki(name):
