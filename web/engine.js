@@ -120,8 +120,8 @@
     if (A.count < 3) return w;
     if (!A.frontline.length) w.push({ level: "위험", text: "앞라인이 없어요. 탱커나 브루저 정글이 좋아요." });
     if (!A.engage.length) w.push({ level: "위험", text: "한타를 열 이니시가 없어요." });
-    if (E.frontline.length >= 2 && !A.antiTank.length)
-      w.push({ level: "위험", text: `상대 앞라인(${E.frontline.join(", ")})을 잡을 챔피언이 없어요. 최대 체력 % 피해나 고정 피해가 있는 정글이 좋아요.` });
+    if (E.tanks.length && !A.antiTank.length)
+      w.push({ level: E.tanks.length >= 2 ? "위험" : "주의", text: `상대 탱커(${E.tanks.join(", ")})를 잡을 챔피언이 없어요. 최대 체력 % 피해나 고정 피해가 있는 정글이 좋아요.` });
     if (A.ccList.length <= 2) w.push({ level: A.ccList.length ? "주의" : "위험", text: `하드 CC가 ${A.ccList.length}개뿐이에요.` });
     if (A.carries.length <= 1) w.push({ level: "주의", text: "딜러가 부족해요. 캐리할 수 있는 정글이 좋아요." });
     if (A.adcIsMage) w.push({ level: "참고", text: "원딜 자리가 비원딜이에요. 원딜 역할을 할 정글이 좋아요." });
@@ -224,14 +224,16 @@
     else if (ap < 0) add("조합", ap * W.apMismatch, `${needText} 정글이 필요한데 ${d} (${A.why})`);
 
     if (A.count >= 3) {
-      const needAnti = E.frontline.length >= 2 && !A.antiTank.length;
+      // 탱커 처리: 상대 탱커 기준 (브루저는 % 피해 없이도 잡을 수 있음, 사용자)
+      const needAnti = E.tanks.length >= 1 && !A.antiTank.length;
       const pureTank = me.frontline && !me.antiTank && (d.endsWith("탱커") || d === "반AP");
       if (!A.frontline.length && me.frontline)
         add("조합", needAnti && pureTank ? W.needFrontline / 3 : W.needFrontline, "우리 팀에 앞라인이 없음");
       if (!A.engage.length && myCC.some((c) => c.use.includes("이니시"))) add("조합", W.needEngage, "우리 팀에 이니시가 없음");
       if (A.ccList.length <= 2 && myCC.length >= 2) add("조합", W.needCC, `우리 팀 하드 CC가 ${A.ccList.length}개뿐인데 하드 CC ${myCC.length}개`);
-      if (needAnti && me.antiTank) add("조합", W.needAntiTank, `상대 앞라인(${E.frontline.join(", ")})을 잡을 딜이 있음`);
-      if (needAnti && pureTank) add("조합", -W.pureTankWhenAntiTank, "탱커를 더해도 상대 앞라인을 잡을 챔피언이 없음");
+      if (needAnti && me.antiTank)
+        add("조합", E.tanks.length >= 2 ? W.needAntiTank : W.needAntiTank - 1, `상대 탱커(${E.tanks.join(", ")})를 잡을 딜이 있음`);
+      if (needAnti && pureTank) add("조합", -W.pureTankWhenAntiTank, "탱커를 더해도 상대 탱커를 잡을 챔피언이 없음");
       if (A.carries.length <= 1 && !pureTank) add("조합", W.needCarry, "우리 팀에 딜러가 부족함");
     }
 

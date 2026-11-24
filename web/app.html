@@ -288,7 +288,7 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       ["확정", "직선", "광역즉시", "광역지연", "지형"].forEach((s) => { if (A.shapes[s]) ac.appendChild(chip(`${s} ${A.shapes[s]}`)); });
       ac.appendChild(chip(`이니시 ${A.engage.length ? A.engage.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.engage.length));
       ac.appendChild(chip(`앞라인 ${A.frontline.length ? A.frontline.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.frontline.length));
-      ac.appendChild(chip(`탱커 처리 ${A.antiTank.length ? A.antiTank.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.antiTank.length && r.enemy.frontline.length >= 2));
+      ac.appendChild(chip(`탱커 처리 ${A.antiTank.length ? A.antiTank.map((p) => p.name).join(", ") : "없음"}`, ally.length >= 3 && !A.antiTank.length && r.enemy.tanks.length >= 1));
       ac.appendChild(chip(`딜러 ${A.carries.length}명`, ally.length >= 3 && A.carries.length <= 1));
       const d = A.dmgCount;
       ac.appendChild(chip(`AD ${d.AD} · AP ${d.AP}${d.혼합 ? ` · 혼합 ${d.혼합}` : ""}${d.탱커 ? ` · 탱커 ${d.탱커}` : ""}`));
@@ -302,7 +302,8 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       ec.appendChild(chip(`${E.count}명 공개`));
       ec.appendChild(chip(`AD ${E.adCount}명`, E.adCount >= 4));
       ec.appendChild(chip(`평타 위주 ${E.autoCount}명`, E.autoCount >= 3));
-      if (E.frontline.length) ec.appendChild(chip(`앞라인 ${E.frontline.join(", ")}`, E.frontline.length >= 3));
+      if (E.tanks.length) ec.appendChild(chip(`탱커 ${E.tanks.join(", ")}`, E.tanks.length >= 2));
+      if (E.frontline.length) ec.appendChild(chip(`앞라인 ${E.frontline.join(", ")}`));
       if (E.assassins.length || E.duelists.length) ec.appendChild(chip(`암살·1:1 강자 ${[...new Set([...E.assassins, ...E.duelists])].join(", ")}`));
       const order = ["확정", "직선", "광역즉시", "광역지연", "지형"];
       order.forEach((s) => { if (E.shapes[s]) ec.appendChild(chip(`${s} CC ${E.shapes[s]}`, s === "확정" && E.shapes[s] >= 3)); });
