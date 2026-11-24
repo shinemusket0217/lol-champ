@@ -64,7 +64,7 @@ def main():
         "pool": {
             n: {
                 "prof": v["숙련도"], "damage": v["딜"], "vuln": v.get("CC_취약도"), "dangerCC": v.get("위험_CC", ""),
-                "rare": v.get("자주_안_꺼냄", False), "ban": v.get("필밴", False), "memo": v.get("메모", ""),
+                "rare": v.get("자주_안_꺼냄", False), "extraDanger": v.get("위험_스킬_추가", []), "ban": v.get("필밴", False), "memo": v.get("메모", ""),
             }
             for n, v in MY_POOL.items()
         },

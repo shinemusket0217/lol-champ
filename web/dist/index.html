@@ -243,7 +243,18 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
       else if (t === "이동기 봉쇄" || t === "평타 무력화")
         E.wild.filter((w) => w.type === t).forEach((w) => hits.push(`${w.champ} ${w.skill} (${t})`));
     });
-    return [...new Set(hits)];
+    (pool.extraDanger || []).forEach((s) => {
+      const c = cc.find((x) => `${x.champ} ${x.key}` === s);
+      if (c) hits.push(`${s} (직접 지정)`);
+    });
+    // 같은 스킬이 두 번 세지지 않게 "챔피언 키" 기준으로 합친다
+    const seen = new Set();
+    return hits.filter((h) => {
+      const k = h.split(" (")[0];
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   }
 
   // ---------- 점수 ----------
@@ -322,13 +333,14 @@ footer { margin-top: 32px; color: var(--muted); font-size: 0.85rem; }
   }
 
   const RULES = {
-    "브라이어": ({ E, minus, notes }) => {
+    "브라이어": ({ E, minus, pool }) => {
       if (!E.byLane["미드"] || !E.byLane["원딜"]) minus(2, "상대 미드와 원딜이 나온 뒤에 고르는 챔피언 (아직 안 나옴)");
+      const extra = pool.extraDanger || [];
       ["미드", "원딜"].forEach((l) => {
         const p = E.byLane[l];
         if (!p) return;
-        E.ccList.filter((c) => c.champ === p.name && c.shape === "광역지연").forEach((c) =>
-          minus(3, `상대 ${l} ${p.name} ${c.key}: 광역지연 CC (브라이어 핵심 카운터)`));
+        E.ccList.filter((c) => c.champ === p.name && (c.shape === "광역지연" || extra.includes(`${c.champ} ${c.key}`))).forEach((c) =>
+          minus(3, `상대 ${l} ${p.name} ${c.key}: W로 못 피하는 CC (브라이어 핵심 카운터)`));
       });
     },
     "그레이브즈": ({ A, E, plus }) => {
