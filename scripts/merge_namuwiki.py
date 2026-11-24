@@ -103,7 +103,7 @@ def main():
         if name in NAMUWIKI:
             entry["상성_불리"] = names_from(name, "불리")
             entry["상성_유리"] = names_from(name, "유리")
-            entry["나무위키_메모"] = NAMUWIKI[name]["메모"] + [f"(충돌, 피드백 우선) {c}" for c in NAMUWIKI[name]["충돌"]]
+            entry["나무위키_메모"] = NAMUWIKI[name]["메모"] + [f"(충돌) {c}" for c in NAMUWIKI[name]["충돌"]]
         picks[name] = {k: entry[k] for k in FIELD_ORDER if k in entry} | {
             k: v for k, v in entry.items() if k not in FIELD_ORDER
         }
